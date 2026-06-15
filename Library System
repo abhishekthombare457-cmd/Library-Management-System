@@ -1,0 +1,374 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <limits>
+ 
+using namespace std;
+ 
+// ------------------- Book Class -------------------
+class Book {
+private:
+    int bookId;
+    string title;
+    string author;
+    bool isIssued;
+    int issuedToMemberId; // -1 if not issued
+ 
+public:
+    Book() : bookId(0), isIssued(false), issuedToMemberId(-1) {}
+ 
+    Book(int id, string t, string a, bool issued = false, int memberId = -1)
+        : bookId(id), title(t), author(a), isIssued(issued), issuedToMemberId(memberId) {}
+ 
+    int getId() const { return bookId; }
+    string getTitle() const { return title; }
+    string getAuthor() const { return author; }
+    bool getIsIssued() const { return isIssued; }
+    int getIssuedTo() const { return issuedToMemberId; }
+ 
+    void issueTo(int memberId) {
+        isIssued = true;
+        issuedToMemberId = memberId;
+    }
+ 
+    void returnBook() {
+        isIssued = false;
+        issuedToMemberId = -1;
+    }
+ 
+    string toFileString() const {
+        ostringstream oss;
+        oss << bookId << "|" << title << "|" << author << "|"
+            << (isIssued ? 1 : 0) << "|" << issuedToMemberId;
+        return oss.str();
+    }
+ 
+    static Book fromFileString(const string& line) {
+        stringstream ss(line);
+        string idStr, t, a, issuedStr, memStr;
+        getline(ss, idStr, '|');
+        getline(ss, t, '|');
+        getline(ss, a, '|');
+        getline(ss, issuedStr, '|');
+        getline(ss, memStr, '|');
+        return Book(stoi(idStr), t, a, issuedStr == "1", stoi(memStr));
+    }
+ 
+    void display() const {
+        cout << "ID: " << bookId
+             << " | Title: " << title
+             << " | Author: " << author
+             << " | Status: " << (isIssued ? ("Issued to Member #" + to_string(issuedToMemberId)) : "Available")
+             << "\n";
+    }
+};
+ 
+// ------------------- Member Class -------------------
+class Member {
+private:
+    int memberId;
+    string name;
+    string contact;
+ 
+public:
+    Member() : memberId(0) {}
+ 
+    Member(int id, string n, string c) : memberId(id), name(n), contact(c) {}
+ 
+    int getId() const { return memberId; }
+    string getName() const { return name; }
+    string getContact() const { return contact; }
+ 
+    string toFileString() const {
+        ostringstream oss;
+        oss << memberId << "|" << name << "|" << contact;
+        return oss.str();
+    }
+ 
+    static Member fromFileString(const string& line) {
+        stringstream ss(line);
+        string idStr, n, c;
+        getline(ss, idStr, '|');
+        getline(ss, n, '|');
+        getline(ss, c, '|');
+        return Member(stoi(idStr), n, c);
+    }
+ 
+    void display() const {
+        cout << "ID: " << memberId
+             << " | Name: " << name
+             << " | Contact: " << contact << "\n";
+    }
+};
+ 
+// ------------------- Library Class -------------------
+class Library {
+private:
+    vector<Book> books;
+    vector<Member> members;
+ 
+    const string booksFile = "books.txt";
+    const string membersFile = "members.txt";
+ 
+    void loadBooks() {
+        books.clear();
+        ifstream file(booksFile);
+        string line;
+        while (getline(file, line)) {
+            if (!line.empty())
+                books.push_back(Book::fromFileString(line));
+        }
+    }
+ 
+    void saveBooks() {
+        ofstream file(booksFile, ios::trunc);
+        for (const auto& b : books)
+            file << b.toFileString() << "\n";
+    }
+ 
+    void loadMembers() {
+        members.clear();
+        ifstream file(membersFile);
+        string line;
+        while (getline(file, line)) {
+            if (!line.empty())
+                members.push_back(Member::fromFileString(line));
+        }
+    }
+ 
+    void saveMembers() {
+        ofstream file(membersFile, ios::trunc);
+        for (const auto& m : members)
+            file << m.toFileString() << "\n";
+    }
+ 
+    int nextBookId() {
+        int maxId = 100;
+        for (const auto& b : books)
+            if (b.getId() > maxId) maxId = b.getId();
+        return maxId + 1;
+    }
+ 
+    int nextMemberId() {
+        int maxId = 1000;
+        for (const auto& m : members)
+            if (m.getId() > maxId) maxId = m.getId();
+        return maxId + 1;
+    }
+ 
+    Book* findBookById(int id) {
+        for (auto& b : books)
+            if (b.getId() == id) return &b;
+        return nullptr;
+    }
+ 
+    Member* findMemberById(int id) {
+        for (auto& m : members)
+            if (m.getId() == id) return &m;
+        return nullptr;
+    }
+ 
+    string toLower(const string& s) const {
+        string result = s;
+        transform(result.begin(), result.end(), result.begin(), ::tolower);
+        return result;
+    }
+ 
+public:
+    Library() {
+        loadBooks();
+        loadMembers();
+    }
+ 
+    // -------- Book Management --------
+    void addBook() {
+        string title, author;
+        cout << "\n--- Add New Book ---\n";
+        cout << "Enter book title: ";
+        cin.ignore();
+        getline(cin, title);
+        cout << "Enter author name: ";
+        getline(cin, author);
+ 
+        int id = nextBookId();
+        books.push_back(Book(id, title, author));
+        saveBooks();
+ 
+        cout << "Book added successfully with ID: " << id << "\n";
+    }
+ 
+    void displayAllBooks() {
+        cout << "\n--- All Books ---\n";
+        if (books.empty()) {
+            cout << "No books in the library.\n";
+            return;
+        }
+        for (const auto& b : books)
+            b.display();
+    }
+ 
+    // -------- Member Management --------
+    void addMember() {
+        string name, contact;
+        cout << "\n--- Add New Member ---\n";
+        cout << "Enter member name: ";
+        cin.ignore();
+        getline(cin, name);
+        cout << "Enter contact number: ";
+        getline(cin, contact);
+ 
+        int id = nextMemberId();
+        members.push_back(Member(id, name, contact));
+        saveMembers();
+ 
+        cout << "Member added successfully with ID: " << id << "\n";
+    }
+ 
+    void displayAllMembers() {
+        cout << "\n--- All Members ---\n";
+        if (members.empty()) {
+            cout << "No members registered.\n";
+            return;
+        }
+        for (const auto& m : members)
+            m.display();
+    }
+ 
+    // -------- Issue / Return --------
+    void issueBook() {
+        int bookId, memberId;
+        cout << "\n--- Issue Book ---\n";
+        cout << "Enter Book ID: ";
+        cin >> bookId;
+        cout << "Enter Member ID: ";
+        cin >> memberId;
+ 
+        Book* book = findBookById(bookId);
+        Member* member = findMemberById(memberId);
+ 
+        if (book == nullptr) {
+            cout << "Book not found.\n";
+            return;
+        }
+        if (member == nullptr) {
+            cout << "Member not found.\n";
+            return;
+        }
+        if (book->getIsIssued()) {
+            cout << "Book is already issued to Member #" << book->getIssuedTo() << ".\n";
+            return;
+        }
+ 
+        book->issueTo(memberId);
+        saveBooks();
+        cout << "Book \"" << book->getTitle() << "\" issued to " << member->getName() << " successfully.\n";
+    }
+ 
+    void returnBook() {
+        int bookId;
+        cout << "\n--- Return Book ---\n";
+        cout << "Enter Book ID: ";
+        cin >> bookId;
+ 
+        Book* book = findBookById(bookId);
+        if (book == nullptr) {
+            cout << "Book not found.\n";
+            return;
+        }
+        if (!book->getIsIssued()) {
+            cout << "This book is not currently issued.\n";
+            return;
+        }
+ 
+        cout << "Book \"" << book->getTitle() << "\" returned from Member #" << book->getIssuedTo() << ".\n";
+        book->returnBook();
+        saveBooks();
+    }
+ 
+    // -------- Search --------
+    void searchBooks() {
+        int choice;
+        string keyword;
+ 
+        cout << "\n--- Search Books ---\n";
+        cout << "1. Search by Title\n";
+        cout << "2. Search by Author\n";
+        cout << "Enter your choice: ";
+        cin >> choice;
+ 
+        cout << "Enter search keyword: ";
+        cin.ignore();
+        getline(cin, keyword);
+ 
+        string keywordLower = toLower(keyword);
+        bool found = false;
+ 
+        cout << "\n--- Search Results ---\n";
+        for (const auto& b : books) {
+            bool match = false;
+            if (choice == 1 && toLower(b.getTitle()).find(keywordLower) != string::npos)
+                match = true;
+            else if (choice == 2 && toLower(b.getAuthor()).find(keywordLower) != string::npos)
+                match = true;
+ 
+            if (match) {
+                b.display();
+                found = true;
+            }
+        }
+ 
+        if (!found)
+            cout << "No matching books found.\n";
+    }
+};
+ 
+// ------------------- Menu -------------------
+void showMenu() {
+    cout << "\n========================================\n";
+    cout << "        LIBRARY MANAGEMENT SYSTEM\n";
+    cout << "========================================\n";
+    cout << "1. Add New Book\n";
+    cout << "2. Display All Books\n";
+    cout << "3. Add New Member\n";
+    cout << "4. Display All Members\n";
+    cout << "5. Issue Book\n";
+    cout << "6. Return Book\n";
+    cout << "7. Search Books (by Title/Author)\n";
+    cout << "8. Exit\n";
+    cout << "Enter your choice: ";
+}
+ 
+int main() {
+    Library library;
+    int choice;
+ 
+    do {
+        showMenu();
+        cin >> choice;
+ 
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Invalid input. Please enter a number.\n";
+            continue;
+        }
+ 
+        switch (choice) {
+            case 1: library.addBook(); break;
+            case 2: library.displayAllBooks(); break;
+            case 3: library.addMember(); break;
+            case 4: library.displayAllMembers(); break;
+            case 5: library.issueBook(); break;
+            case 6: library.returnBook(); break;
+            case 7: library.searchBooks(); break;
+            case 8: cout << "Exiting... Goodbye!\n"; break;
+            default: cout << "Invalid choice. Please try again.\n";
+        }
+    } while (choice != 8);
+ 
+    return 0;
+}
+ 
